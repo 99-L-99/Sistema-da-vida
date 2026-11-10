@@ -1,0 +1,915 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor Multiparamétrico Hospitalar</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 20px;
+    background: #080d12;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+.monitor {
+    max-width: 1250px;
+    margin: auto;
+    background: #101820;
+    border: 2px solid #34434d;
+    padding: 20px;
+    border-radius: 12px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    border-bottom: 1px solid #34434d;
+    padding-bottom: 15px;
+}
+
+h1 {
+    color: #00ff88;
+    font-size: 24px;
+}
+
+.verde { color: #00ff88; }
+.azul { color: #00ccff; }
+.amarelo { color: #ffcc00; }
+.vermelho { color: #ff4444; }
+
+.painel {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.card {
+    background: #080e13;
+    padding: 15px;
+    border: 1px solid #34434d;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.card h3 {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.valor {
+    font-size: clamp(25px, 4vw, 42px);
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+.grafico {
+    background: #020806;
+    border: 1px solid #244333;
+    padding: 12px;
+    margin: 15px 0 25px;
+    border-radius: 8px;
+}
+
+.grafico h3 {
+    font-size: 14px;
+}
+
+canvas {
+    width: 100%;
+    height: 190px;
+    display: block;
+}
+
+.area {
+    background: #080e13;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.linha {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+input, select {
+    padding: 11px;
+    background: #17242e;
+    color: white;
+    border: 1px solid #52616b;
+    border-radius: 5px;
+    margin: 5px;
+    max-width: 100%;
+}
+
+button {
+    padding: 12px 16px;
+    margin: 5px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    background: #087c55;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+button:hover {
+    opacity: .8;
+}
+
+.perigo {
+    background: #a52222;
+}
+
+.secundario {
+    background: #34434d;
+}
+
+.estado {
+    padding: 16px;
+    border-radius: 7px;
+    background: #103522;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+.estado.alerta {
+    background: #603e09;
+    color: #ffdf70;
+}
+
+.estado.critico {
+    background: #551313;
+    color: #ff5555;
+    animation: piscar .8s infinite alternate;
+}
+
+@keyframes piscar {
+    from { opacity: 1; }
+    to { opacity: .5; }
+}
+
+.historico {
+    max-height: 180px;
+    overflow-y: auto;
+    background: #080e13;
+    padding: 10px;
+}
+
+.historico p {
+    border-bottom: 1px solid #263b49;
+    padding-bottom: 8px;
+    font-size: 13px;
+}
+
+@media(max-width: 700px) {
+    .painel {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media(max-width: 400px) {
+    body {
+        padding: 7px;
+    }
+
+    .monitor {
+        padding: 10px;
+    }
+
+    .card {
+        padding: 8px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="monitor">
+
+<header>
+    <div>
+        <h1>♥ MONITOR CARDÍACO</h1>
+        <p>Central de monitoramento multiparamétrico</p>
+    </div>
+
+    <div>
+        <div id="statusSistema" class="verde">● SISTEMA ATIVO</div>
+        <div id="relogio"></div>
+    </div>
+</header>
+
+<!-- PACIENTE -->
+
+<div class="area">
+    <h3>IDENTIFICAÇÃO DO PACIENTE</h3>
+
+    <div class="linha">
+        <input id="nome" placeholder="Nome do paciente">
+        <input id="idade" type="number" placeholder="Idade">
+        <input id="leito" placeholder="Número do leito">
+    </div>
+</div>
+
+<!-- INDICADORES -->
+
+<div class="painel">
+
+    <div class="card">
+        <h3>FREQUÊNCIA CARDÍACA</h3>
+        <div class="valor verde" id="fc">75</div>
+        BPM
+    </div>
+
+    <div class="card">
+        <h3>SATURAÇÃO DE OXIGÊNIO</h3>
+        <div class="valor azul" id="spo2">98</div>
+        %
+    </div>
+
+    <div class="card">
+        <h3>PRESSÃO ARTERIAL</h3>
+        <div class="valor amarelo" id="pa">120/80</div>
+        mmHg
+    </div>
+
+    <div class="card">
+        <h3>TEMPERATURA</h3>
+        <div class="valor azul" id="temp">36.5</div>
+        °C
+    </div>
+
+</div>
+
+<!-- ECG -->
+
+<div class="grafico">
+    <h3 class="verde">ECG - ELETROCARDIOGRAMA</h3>
+    <canvas id="ecg"></canvas>
+</div>
+
+<!-- OXIMETRIA -->
+
+<div class="grafico">
+    <h3 class="azul">PLETISMOGRAFIA - SpO₂</h3>
+    <canvas id="oxig"></canvas>
+</div>
+
+<!-- CONDIÇÕES -->
+
+<div class="area">
+
+    <h3>CONDIÇÕES CLÍNICAS SIMULADAS</h3>
+
+    <select id="condicao">
+        <option value="normal">Normalidade</option>
+        <option value="bradicardia">Bradicardia</option>
+        <option value="taquicardia">Taquicardia</option>
+        <option value="arritmia">Arritmia</option>
+        <option value="hipoxemia">Hipoxemia</option>
+        <option value="hipotensao">Hipotensão</option>
+        <option value="hipertensao">Hipertensão</option>
+        <option value="hipotermia">Hipotermia</option>
+        <option value="hipertermia">Hipertermia</option>
+        <option value="parada">Parada cardíaca simulada</option>
+    </select>
+
+    <button onclick="aplicarCondicao()">APLICAR CONDIÇÃO</button>
+
+    <div class="estado" id="estado">
+        CONDIÇÃO: NORMALIDADE
+    </div>
+
+    <p id="descricao">
+        Parâmetros simulados dentro dos limites configurados.
+    </p>
+
+</div>
+
+<!-- CONTROLES -->
+
+<div class="area">
+
+    <h3>CONTROLES DO MONITOR</h3>
+
+    <button onclick="iniciar()">▶ INICIAR</button>
+    <button class="secundario" onclick="pausar()">Ⅱ PAUSAR</button>
+    <button onclick="normalizar()">↻ NORMALIZAR</button>
+    <button class="perigo" onclick="alternarAlarme()" id="botaoAlarme">
+        🔔 ALARME: LIGADO
+    </button>
+
+</div>
+
+<!-- ALARMES -->
+
+<div class="area">
+
+    <h3>CENTRAL DE ALARMES</h3>
+
+    <div id="alarmStatus" class="estado">
+        NENHUM ALARME ATIVO
+    </div>
+
+    <h3>HISTÓRICO DE EVENTOS</h3>
+
+    <div class="historico" id="historico">
+        <p>Sistema iniciado.</p>
+    </div>
+
+    <button class="secundario" onclick="limparHistorico()">
+        LIMPAR HISTÓRICO
+    </button>
+
+</div>
+
+<p style="text-align:center;color:#777;font-size:12px">
+SIMULADOR EDUCACIONAL — NÃO UTILIZAR PARA MONITORAMENTO REAL
+</p>
+
+</div>
+
+<script>
+
+// CONFIGURAÇÕES
+
+const total = 360;
+const taxaAmostra = 60;
+
+let ativo = true;
+let alarmeAtivo = true;
+let condicaoAtual = "normal";
+
+let fc = 75;
+let spo2 = 98;
+let sistolica = 120;
+let diastolica = 80;
+let temperatura = 36.5;
+
+let tempoSimulado = 0;
+let fase = 0;
+let ultimoFrame = 0;
+let acumulador = 0;
+let ultimoEvento = "";
+let ultimoSom = 0;
+
+let ecgDados = [];
+let oxigDados = [];
+
+let audio = null;
+
+const ecg = document.getElementById("ecg");
+const oxig = document.getElementById("oxig");
+
+const ctx = ecg.getContext("2d");
+const ctx2 = oxig.getContext("2d");
+
+// CENÁRIOS
+
+const condicoes = {
+
+    normal: {
+        fc:75, spo2:98, sis:120, dia:80, temp:36.5,
+        nome:"NORMALIDADE",
+        descricao:"Parâmetros simulados dentro dos limites configurados."
+    },
+
+    bradicardia: {
+        fc:42, spo2:97, sis:105, dia:70, temp:36.5,
+        nome:"BRADICARDIA",
+        descricao:"Simulação de frequência cardíaca reduzida."
+    },
+
+    taquicardia: {
+        fc:145, spo2:97, sis:135, dia:85, temp:37.2,
+        nome:"TAQUICARDIA",
+        descricao:"Simulação de frequência cardíaca acelerada."
+    },
+
+    arritmia: {
+        fc:110, spo2:96, sis:120, dia:80, temp:36.7,
+        nome:"ARRITMIA",
+        descricao:"Simulação de ritmo cardíaco irregular."
+    },
+
+    hipoxemia: {
+        fc:110, spo2:84, sis:110, dia:75, temp:36.8,
+        nome:"HIPOXEMIA",
+        descricao:"Simulação de baixa saturação de oxigênio."
+    },
+
+    hipotensao: {
+        fc:105, spo2:96, sis:80, dia:50, temp:36.5,
+        nome:"HIPOTENSÃO",
+        descricao:"Simulação de pressão arterial reduzida."
+    },
+
+    hipertensao: {
+        fc:90, spo2:97, sis:175, dia:110, temp:36.5,
+        nome:"HIPERTENSÃO",
+        descricao:"Simulação de pressão arterial elevada."
+    },
+
+    hipotermia: {
+        fc:55, spo2:95, sis:100, dia:65, temp:34,
+        nome:"HIPOTERMIA",
+        descricao:"Simulação de temperatura corporal reduzida."
+    },
+
+    hipertermia: {
+        fc:115, spo2:96, sis:125, dia:82, temp:40,
+        nome:"HIPERTERMIA",
+        descricao:"Simulação de temperatura corporal elevada."
+    },
+
+    parada: {
+        fc:0, spo2:70, sis:0, dia:0, temp:36.5,
+        nome:"PARADA CARDÍACA SIMULADA",
+        descricao:"Simulação de ausência de atividade cardíaca detectável."
+    }
+
+};
+
+// APLICAR CONDIÇÃO
+
+function aplicarCondicao() {
+
+    const escolha = document.getElementById("condicao").value;
+    const dados = condicoes[escolha];
+
+    condicaoAtual = escolha;
+
+    fc = dados.fc;
+    spo2 = dados.spo2;
+    sistolica = dados.sis;
+    diastolica = dados.dia;
+    temperatura = dados.temp;
+
+    tempoSimulado = 0;
+    acumulador = 0;
+    ecgDados = [];
+    oxigDados = [];
+
+    document.getElementById("estado").innerText =
+        "CONDIÇÃO: " + dados.nome;
+
+    document.getElementById("descricao").innerText =
+        dados.descricao;
+
+    adicionarHistorico("Condição aplicada: " + dados.nome);
+
+    atualizar();
+
+}
+
+function normalizar() {
+    document.getElementById("condicao").value = "normal";
+    aplicarCondicao();
+}
+
+// ATUALIZAR INDICADORES
+
+function atualizar() {
+
+    document.getElementById("fc").innerText = fc;
+    document.getElementById("spo2").innerText = spo2;
+
+    document.getElementById("pa").innerText =
+        sistolica === 0 ? "--/--" : sistolica + "/" + diastolica;
+
+    document.getElementById("temp").innerText =
+        temperatura.toFixed(1);
+
+    verificarAlarmes();
+
+}
+
+// ALARMES
+
+function verificarAlarmes() {
+
+    let alarmes = [];
+
+    if (fc === 0) {
+        alarmes.push("AUSÊNCIA DE FREQUÊNCIA CARDÍACA");
+    } else if (fc < 60 || fc > 100) {
+        alarmes.push("FREQUÊNCIA CARDÍACA ALTERADA");
+    }
+
+    if (spo2 < 90) {
+        alarmes.push("SATURAÇÃO CRITICAMENTE BAIXA");
+    } else if (spo2 < 95) {
+        alarmes.push("SATURAÇÃO REDUZIDA");
+    }
+
+    if (sistolica > 0 && sistolica < 90) {
+        alarmes.push("PRESSÃO ARTERIAL BAIXA");
+    }
+
+    if (sistolica >= 140 || diastolica >= 90) {
+        alarmes.push("PRESSÃO ARTERIAL ELEVADA");
+    }
+
+    if (temperatura < 35) {
+        alarmes.push("TEMPERATURA BAIXA");
+    }
+
+    if (temperatura >= 38) {
+        alarmes.push("TEMPERATURA ELEVADA");
+    }
+
+    const elemento = document.getElementById("alarmStatus");
+
+    if (alarmes.length > 0) {
+
+        elemento.className = "estado critico";
+        elemento.innerText = "⚠ " + alarmes.join(" | ");
+
+        if (alarmes.join("|") !== ultimoEvento) {
+            adicionarHistorico(alarmes.join(", "));
+            ultimoEvento = alarmes.join("|");
+        }
+
+        if (alarmeAtivo && ativo) {
+            tocarAlarme();
+        }
+
+    } else {
+
+        elemento.className = "estado";
+        elemento.innerText = "NENHUM ALARME ATIVO";
+        ultimoEvento = "";
+
+    }
+
+}
+
+// HISTÓRICO
+
+function adicionarHistorico(mensagem) {
+
+    const historico = document.getElementById("historico");
+    const item = document.createElement("p");
+
+    item.innerText =
+        new Date().toLocaleTimeString("pt-BR") + " - " + mensagem;
+
+    historico.prepend(item);
+
+}
+
+function limparHistorico() {
+    document.getElementById("historico").innerHTML =
+        "<p>Histórico limpo.</p>";
+}
+
+// SOM
+
+async function alternarAlarme() {
+
+    alarmeAtivo = !alarmeAtivo;
+
+    if (alarmeAtivo) {
+
+        if (!audio) {
+            audio = new AudioContext();
+        }
+
+        if (audio.state === "suspended") {
+            await audio.resume();
+        }
+
+        document.getElementById("botaoAlarme").innerText =
+            "🔔 ALARME: LIGADO";
+
+    } else {
+
+        document.getElementById("botaoAlarme").innerText =
+            "🔕 ALARME: DESLIGADO";
+
+    }
+
+    adicionarHistorico(
+        alarmeAtivo ? "Alarme sonoro ativado." : "Alarme sonoro desativado."
+    );
+
+}
+
+function tocarAlarme() {
+
+    if (!audio || audio.state !== "running") return;
+
+    if (Date.now() - ultimoSom < 1000) return;
+
+    ultimoSom = Date.now();
+
+    const oscilador = audio.createOscillator();
+    const volume = audio.createGain();
+
+    oscilador.frequency.value = 850;
+    volume.gain.value = 0.06;
+
+    oscilador.connect(volume);
+    volume.connect(audio.destination);
+
+    oscilador.start();
+
+    volume.gain.exponentialRampToValueAtTime(
+        0.001,
+        audio.currentTime + 0.25
+    );
+
+    oscilador.stop(audio.currentTime + 0.25);
+
+}
+
+// CONTROLES
+
+function iniciar() {
+
+    ativo = true;
+
+    document.getElementById("statusSistema").innerText =
+        "● SISTEMA ATIVO";
+
+    document.getElementById("statusSistema").className = "verde";
+
+    ultimoFrame = 0;
+
+    adicionarHistorico("Monitor iniciado.");
+
+    atualizar();
+
+}
+
+function pausar() {
+
+    ativo = false;
+
+    document.getElementById("statusSistema").innerText =
+        "Ⅱ SISTEMA PAUSADO";
+
+    document.getElementById("statusSistema").className = "amarelo";
+
+    adicionarHistorico("Monitor pausado.");
+
+}
+
+// ONDAS
+
+function gauss(x, centro, largura, amplitude) {
+
+    return amplitude * Math.exp(
+        -Math.pow((x - centro) / largura, 2) / 2
+    );
+
+}
+
+// ECG
+
+function calcularECG(fase) {
+
+    if (condicaoAtual === "parada") return 0;
+
+    let onda =
+
+        gauss(fase, 0.18, 0.035, 9) +
+        gauss(fase, 0.355, 0.012, -12) +
+        gauss(fase, 0.385, 0.009, 75) +
+        gauss(fase, 0.415, 0.015, -20) +
+        gauss(fase, 0.68, 0.065, 18);
+
+    if (condicaoAtual === "arritmia") {
+        onda += gauss(
+            fase,
+            0.50,
+            0.025,
+            Math.sin(tempoSimulado * 13) * 12
+        );
+    }
+
+    return onda;
+
+}
+
+// PLETISMOGRAFIA
+
+function calcularOxig(fase) {
+
+    if (condicaoAtual === "parada") return 0;
+
+    let subida = 0;
+
+    if (fase >= 0.04 && fase < 0.23) {
+
+        let x = (fase - 0.04) / 0.19;
+
+        subida = x * x * (3 - 2 * x);
+
+    } else if (fase >= 0.23) {
+
+        let x = fase - 0.23;
+
+        subida = Math.exp(-4.5 * x);
+
+        subida -= 0.12 * Math.exp(
+            -Math.pow((fase - 0.56) / 0.035, 2)
+        );
+
+    }
+
+    return Math.max(0, subida) * 40;
+
+}
+
+// CANVAS
+
+function preparar(canvas, contexto) {
+
+    let largura = canvas.clientWidth;
+    let altura = canvas.clientHeight;
+
+    let escala = window.devicePixelRatio || 1;
+
+    if (
+        canvas.width !== Math.round(largura * escala) ||
+        canvas.height !== Math.round(altura * escala)
+    ) {
+
+        canvas.width = largura * escala;
+        canvas.height = altura * escala;
+
+    }
+
+    contexto.setTransform(escala, 0, 0, escala, 0, 0);
+
+    return { largura, altura };
+
+}
+
+// DESENHAR GRÁFICOS
+
+function desenhar(canvas, contexto, dados, cor, amplitude) {
+
+    const { largura, altura } = preparar(canvas, contexto);
+
+    contexto.fillStyle = "#020806";
+    contexto.fillRect(0, 0, largura, altura);
+
+    contexto.strokeStyle = "#173322";
+    contexto.lineWidth = 1;
+
+    for (let x = 0; x < largura; x += 10) {
+
+        contexto.beginPath();
+        contexto.moveTo(x, 0);
+        contexto.lineTo(x, altura);
+        contexto.stroke();
+
+    }
+
+    for (let y = 0; y < altura; y += 10) {
+
+        contexto.beginPath();
+        contexto.moveTo(0, y);
+        contexto.lineTo(largura, y);
+        contexto.stroke();
+
+    }
+
+    contexto.strokeStyle = "#285238";
+
+    for (let x = 0; x < largura; x += 50) {
+
+        contexto.beginPath();
+        contexto.moveTo(x, 0);
+        contexto.lineTo(x, altura);
+        contexto.stroke();
+
+    }
+
+    contexto.beginPath();
+    contexto.strokeStyle = cor;
+    contexto.lineWidth = 2;
+    contexto.lineJoin = "round";
+    contexto.lineCap = "round";
+
+    dados.forEach((valor, i) => {
+
+        let x = i * largura / (total - 1);
+        let y = altura / 2 - valor * amplitude;
+
+        if (i === 0) {
+            contexto.moveTo(x, y);
+        } else {
+            contexto.lineTo(x, y);
+        }
+
+    });
+
+    contexto.stroke();
+
+}
+
+// GERAR AMOSTRAS SINCRONIZADAS
+
+function gerarAmostra() {
+
+    let periodo = 60 / Math.max(fc, 1);
+
+    let faseCardiaca =
+        (tempoSimulado % periodo) / periodo;
+
+    let sinalECG = calcularECG(faseCardiaca);
+
+    let atraso = 0.18;
+
+    let tempoPulso =
+        (tempoSimulado - atraso + periodo * 10) % periodo;
+
+    let fasePulso = tempoPulso / periodo;
+
+    let sinalOxig = calcularOxig(fasePulso);
+
+    ecgDados.push(sinalECG);
+    oxigDados.push(sinalOxig);
+
+    if (ecgDados.length > total) {
+        ecgDados.shift();
+        oxigDados.shift();
+    }
+
+    tempoSimulado += 1 / taxaAmostra;
+
+}
+
+// ANIMAÇÃO
+
+function animar(timestamp) {
+
+    if (ultimoFrame === 0) {
+        ultimoFrame = timestamp;
+    }
+
+    let delta = Math.min(
+        (timestamp - ultimoFrame) / 1000,
+        0.05
+    );
+
+    ultimoFrame = timestamp;
+
+    if (ativo) {
+
+        acumulador += delta;
+
+        while (acumulador >= 1 / taxaAmostra) {
+
+            gerarAmostra();
+
+            acumulador -= 1 / taxaAmostra;
+
+        }
+
+        desenhar(ecg, ctx, ecgDados, "#00ff88", 1.1);
+
+        desenhar(oxig, ctx2, oxigDados, "#00ccff", 1);
+
+    }
+
+    requestAnimationFrame(animar);
+
+}
+
+// RELÓGIO
+
+setInterval(() => {
+
+    document.getElementById("relogio").innerText =
+        new Date().toLocaleTimeString("pt-BR");
+
+}, 1000);
+
+// INICIALIZAÇÃO
+
+atualizar();
+animar();
+
+</script>
+
+</body>
+</html>
